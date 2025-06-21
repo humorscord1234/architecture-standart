@@ -1,0 +1,22 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(cc_manager, "Специалист Колл-центра")
+Person(bo_manager, "Специалист бэкофиса", "Менеджер по работе с депозитами")
+System_Ext(call_center, "Колл-центр", "Прием звонков и заявок от клиентов")
+
+System_Boundary(bank, "Банк Стандарт"){
+    System(deposits, "Депозиты", "Система управления депозитами")
+
+    System(call_center_dash_admin, "Сервис управления пользователями и авторизацией для сотрудников Колл центра")
+    System(call_center_dash, "INFO панель для сотрудников колл центра")
+
+    }
+
+Rel(cc_manager, call_center, "Принимает звонки и заявки от клиентов", "Телефон")
+Rel(cc_manager, call_center_dash, "Запрашивает ставки по депозитам", "HTTPS")
+Rel(call_center_dash, call_center_dash_admin, "Проверяет аутентифицирован ли пользователь", "HTTPS")
+Rel(call_center_dash, deposits, "Проверяет аутентифицирован ли пользователь", "HTTPS")
+Rel(bo_manager, deposits, "Обновляет ставки по депозитам", "HTTPS")
+@enduml

@@ -1,0 +1,80 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(user, "Клиент", "Планирует открыть депозит")
+Person(backoffice_manager, "Менеджер", "Сотрудник бэкофиса")
+Person(frontoffice_manager, "Менеджер", "Сотрудник фронтофиса")
+
+System_Ext(callcenter, "Колл-центр", "Внутреняя система подрядчика")
+System_Ext(sms_operator, "Телеком-оператор", "Внешний сервис для отправки СМС")
+
+
+System_Boundary(bank, "Банк Стандарт"){
+    Container(waf, "WAF", "WAF", "WAF")
+    Container(static_content, "React", "WEB APP", "WEB APP")
+    Container(api_gateway, "API Gateway", "Nginx", "Проксирует запросы к API")
+    Container(ffb_mobile, "ffb mobile", "Java, Spring", "back end для мобильной версии сайта")
+    Container(ffb_desktop, "ffb desktop", "Java, Spring", "back end для десктоп версии сайта")
+    Container_Ext(notifications, "Система уведомлений", "TBD", "Рассылает уведомления клиентам")
+    Container_Ext(monitoring, "Система мониторинга", "Prometheus, Grafana, ELK, Graylog, Jaeger", "Система мониторинга, логов и алертинга")
+    ContainerQueue(message_queue, "Очередь сообщений", "Kafka", "Передача сообщений между сервисами")
+    ContainerQueue(ib_app_proxy, "Прокси сервис к Интернет-банк (Легаси)", "Java", "")
+    ContainerQueue(abs_proxy, "Прокси сервис к АБС", "Java", "")
+
+    Container_Boundary(internet_bank, "Интернет-банк (Легаси)") {
+        Container(ib_app, "Веб-приложение", "ASP.NET MVC 4.5", "Существующее веб-приложение")
+        ContainerDb(ib_db, "База данных интернет-банка", "MS SQL", "Хранит данные о депозитах")
+        Rel_D(ib_app, ib_db, "Чтение/Запись", "SQL")
+
+    }
+
+    Container_Boundary(deposits_service, "Сервис депозитов") {
+        Container(deposits_ui, "Микрофронтенд депозитов", "React", "Интерфейс для работы с депозитами")
+        Container(deposits_api, "API сервиса депозитов", "Java", "Бэкенд для работы с депозитами")
+        ContainerDb(deposits_db, "База данных депозитов", "PostgreSQL", "Хранит данные о депозитах")
+        Rel_D(deposits_api, deposits_db, "Чтение/Заипсь", "SQL")
+    }
+
+    Container_Boundary(abs, "АБС (Легаси)") {
+        Container(abs_client, "Десктопное приложение", "Delphi", "Основной инструмент работы менеджеров")
+        Container(abs_db, "База данных АБС", "Oracle", "Хранит данные. Выполняет бизнес-логику через хранимые процедуры")
+        Container(abs_rate_limiter, "Рейт-лимитер", "Java", "Рейт-лимитер на чтение из очереди")
+        Rel_D(abs_client, abs_db, "Чтение/Запись", "SQL")
+        Rel(abs_rate_limiter, abs_db, "Чтение/Запись", "SQL")
+    }
+
+    ' Связи пользователя
+    Rel(user, waf, "Взаимодействие с интернет банком", "HTTPS")
+    Rel(user, callcenter, "Звонки по выделенному номеру", "Телефон")
+    Rel(sms_operator, user, "SMS уведомления", "SMS")
+
+    ' Связи менеджеров
+    Rel(backoffice_manager, waf, "Работает с системой")
+    Rel(frontoffice_manager, waf, "Работает с системой")
+
+    ' Связи GW
+    Rel(waf, static_content, "Проксирует запросы", "HTTPS")
+    Rel(waf, api_gateway, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, ffb_mobile, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, ffb_desktop, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, ib_app_proxy, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, abs_proxy, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, deposits_service, "Проксирует запросы", "HTTPS")
+    Rel(abs_proxy, abs, "Проксирует запросы", "HTTPS")
+    Rel(ib_app_proxy, internet_bank, "Проксирует запросы", "HTTPS")
+    Rel(ffb_mobile, ib_app_proxy, "Проксирует запросы", "HTTPS")
+    Rel(ffb_mobile, abs_proxy, "Проксирует запросы", "HTTPS")
+    Rel(ffb_desktop, ib_app_proxy, "Проксирует запросы", "HTTPS")
+    Rel(ffb_desktop, abs_proxy, "Проксирует запросы", "HTTPS")
+
+    ' Связи сервисов
+    Rel(deposits_ui, ib_app, "Встраивается в", "JavaScript, HTTPS")
+    Rel(deposits_api, message_queue, "Отправляет события", "Kafka")
+    Rel(message_queue, notifications, "Читает события", "Kafka")
+    Rel(notifications, sms_operator, "Отправляет СМС", "HTTP API")
+    Rel(abs_rate_limiter, message_queue, "Читает события", "Kafka")
+    Rel(deposits_api, message_queue, "Читает события", "Kafka")
+    Rel(abs_client, message_queue, "Отправляет события", "Kafka")
+}
+@enduml
