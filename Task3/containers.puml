@@ -2,30 +2,27 @@
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-Person(user, "Клиент", "Планирует открыть депозит")
-Person(backoffice_manager, "Менеджер", "Сотрудник бэкофиса")
-Person(frontoffice_manager, "Менеджер", "Сотрудник фронтофиса")
+Person(user_public_client, "Клиент", "Планирует открыть депозит")
+Person(user_manager_backoffice, "Менеджер", "Сотрудник бэкофиса")
+Person(user_manager_frontoffice, "Менеджер", "Сотрудник фронтофиса")
 
-System_Ext(callcenter, "Колл-центр", "Внутреняя система подрядчика")
-System_Ext(sms_operator, "Телеком-оператор", "Внешний сервис для отправки СМС")
+System_Ext(callcenter, "Колл-центр", "Клиент-серверная система на платформе подрядчика")
+System_Ext(sms_operator, "Сервис отправки СМС", "Внешний оператор по отправке СМС")
 
 
 System_Boundary(bank, "Банк Стандарт"){
-    Container(waf, "WAF", "WAF", "WAF")
-    Container(static_content, "React", "WEB APP", "WEB APP")
+    Container(waf, "waf", "waf", "Защищает систему от нелегитимного траффика")
     Container(api_gateway, "API Gateway", "Nginx", "Проксирует запросы к API")
-    Container(ffb_mobile, "ffb mobile", "Java, Spring", "back end для мобильной версии сайта")
-    Container(ffb_desktop, "ffb desktop", "Java, Spring", "back end для десктоп версии сайта")
-    Container_Ext(notifications, "Система уведомлений", "TBD", "Рассылает уведомления клиентам")
-    Container_Ext(monitoring, "Система мониторинга", "Prometheus, Grafana, ELK, Graylog, Jaeger", "Система мониторинга, логов и алертинга")
+    Container_Ext(notifications_service, "Система уведомлений", "ASP.NET MVC 4.5", "Сервис формирования сообщений и отправка их через внешний сервис")
+    Container_Ext(monitoring, "Система мониторинга", "Grafana, Prometheus, Promeheus Alert Manager", "Система мониторинга и алертинга")
+    Container(managers_panel_ui, "Панель менеджеров", "React", "Веб-приложение для работы менеджеров")
+    Container(managers_panel_app, "Панель менеджеров", "Java", "Веб-приложение для работы менеджеров")
     ContainerQueue(message_queue, "Очередь сообщений", "Kafka", "Передача сообщений между сервисами")
-    ContainerQueue(ib_app_proxy, "Прокси сервис к Интернет-банк (Легаси)", "Java", "")
-    ContainerQueue(abs_proxy, "Прокси сервис к АБС", "Java", "")
 
-    Container_Boundary(internet_bank, "Интернет-банк (Легаси)") {
-        Container(ib_app, "Веб-приложение", "ASP.NET MVC 4.5", "Существующее веб-приложение")
-        ContainerDb(ib_db, "База данных интернет-банка", "MS SQL", "Хранит данные о депозитах")
-        Rel_D(ib_app, ib_db, "Чтение/Запись", "SQL")
+    Container_Boundary(internet_bank, "Интернет-банк") {
+        Container(internet_bank_app, "Веб-приложение", "ASP.NET MVC 4.5", "Существующее веб-приложение")
+        ContainerDb(internet_bank_db, "База данных интернет-банка", "MS SQL", "Хранит данные о депозитах")
+        Rel_D(internet_bank_app, internet_bank_db, "чтение/запись", "SQL")
 
     }
 
@@ -33,47 +30,38 @@ System_Boundary(bank, "Банк Стандарт"){
         Container(deposits_ui, "Микрофронтенд депозитов", "React", "Интерфейс для работы с депозитами")
         Container(deposits_api, "API сервиса депозитов", "Java", "Бэкенд для работы с депозитами")
         ContainerDb(deposits_db, "База данных депозитов", "PostgreSQL", "Хранит данные о депозитах")
-        Rel_D(deposits_api, deposits_db, "Чтение/Заипсь", "SQL")
+        Rel_D(deposits_api, deposits_db, "чтение/запись", "SQL")
     }
 
-    Container_Boundary(abs, "АБС (Легаси)") {
+    Container_Boundary(abs, "АБС") {
         Container(abs_client, "Десктопное приложение", "Delphi", "Основной инструмент работы менеджеров")
         Container(abs_db, "База данных АБС", "Oracle", "Хранит данные. Выполняет бизнес-логику через хранимые процедуры")
-        Container(abs_rate_limiter, "Рейт-лимитер", "Java", "Рейт-лимитер на чтение из очереди")
-        Rel_D(abs_client, abs_db, "Чтение/Запись", "SQL")
-        Rel(abs_rate_limiter, abs_db, "Чтение/Запись", "SQL")
+        Container(abs_integration_deposits, "Рейт-лимитер", "ASP.NET MVC 4.5", "Сервис для работы с данными в Kafka")
+        Rel_D(abs_client, abs_db, "чтение/запись", "SQL")
+        Rel(abs_integration_deposits, abs_db, "запись", "SQL")
     }
 
-    ' Связи пользователя
-    Rel(user, waf, "Взаимодействие с интернет банком", "HTTPS")
-    Rel(user, callcenter, "Звонки по выделенному номеру", "Телефон")
-    Rel(sms_operator, user, "SMS уведомления", "SMS")
+    Rel(user_public_client, internet_bank_app, "Работает с системой", "HTTPS")
+    Rel(user_public_client, callcenter, "Оставляет заявки", "Телефон")
+    Rel(sms_operator, user_public_client, "Отправляет уведомления", "SMS")
 
-    ' Связи менеджеров
-    Rel(backoffice_manager, waf, "Работает с системой")
-    Rel(frontoffice_manager, waf, "Работает с системой")
+    Rel(user_manager_backoffice, abs_client, "Работает с системой")
+    Rel(user_manager_frontoffice, abs_client, "Работает с системой")
+    Rel(user_manager_backoffice, managers_panel_ui, "Работает с системой", "HTTPS")
+    Rel(user_manager_frontoffice, managers_panel_ui, "Работает с системой", "HTTPS")
+    Rel(callcenter, managers_panel_ui, "Передает заявки", "HTTPS")
 
-    ' Связи GW
-    Rel(waf, static_content, "Проксирует запросы", "HTTPS")
-    Rel(waf, api_gateway, "Проксирует запросы", "HTTPS")
-    Rel(api_gateway, ffb_mobile, "Проксирует запросы", "HTTPS")
-    Rel(api_gateway, ffb_desktop, "Проксирует запросы", "HTTPS")
-    Rel(api_gateway, ib_app_proxy, "Проксирует запросы", "HTTPS")
-    Rel(api_gateway, abs_proxy, "Проксирует запросы", "HTTPS")
-    Rel(api_gateway, deposits_service, "Проксирует запросы", "HTTPS")
-    Rel(abs_proxy, abs, "Проксирует запросы", "HTTPS")
-    Rel(ib_app_proxy, internet_bank, "Проксирует запросы", "HTTPS")
-    Rel(ffb_mobile, ib_app_proxy, "Проксирует запросы", "HTTPS")
-    Rel(ffb_mobile, abs_proxy, "Проксирует запросы", "HTTPS")
-    Rel(ffb_desktop, ib_app_proxy, "Проксирует запросы", "HTTPS")
-    Rel(ffb_desktop, abs_proxy, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, deposits_api, "Проксирует запросы", "HTTPS")
+    Rel(api_gateway, managers_panel_app, "Проксирует запросы", "HTTPS")
+    Rel(deposits_ui, api_gateway, "Запрашивает данные", "REST API, HTTPS")
+    Rel(managers_panel_app, api_gateway, "Запрашивает данные", "HTTPS")
+    Rel(managers_panel_ui, managers_panel_app, "Запрашивает данные", "HTTPS")
 
-    ' Связи сервисов
-    Rel(deposits_ui, ib_app, "Встраивается в", "JavaScript, HTTPS")
+    Rel(deposits_ui, internet_bank_app, "Встраивается в", "JavaScript, HTTPS")
     Rel(deposits_api, message_queue, "Отправляет события", "Kafka")
-    Rel(message_queue, notifications, "Читает события", "Kafka")
-    Rel(notifications, sms_operator, "Отправляет СМС", "HTTP API")
-    Rel(abs_rate_limiter, message_queue, "Читает события", "Kafka")
+    Rel(message_queue, notifications_service, "Читает события", "Kafka")
+    Rel(notifications_service, sms_operator, "Отправляет СМС", "HTTP API")
+    Rel(abs_integration_deposits, message_queue, "Читает события", "Kafka")
     Rel(deposits_api, message_queue, "Читает события", "Kafka")
     Rel(abs_client, message_queue, "Отправляет события", "Kafka")
 }
